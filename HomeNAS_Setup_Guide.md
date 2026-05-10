@@ -28,16 +28,23 @@ Plus you own the whole stack. No proprietary OS, no per-app licensing, no surpri
 
 ---
 
-## Network Addresses
+## Your Values
 
-You'll see two IPs throughout this guide. Keep them straight:
+Every IP, username, hostname, and email in this guide is a **concrete example**, not a literal value to copy. Fill in your own values in the right column as you complete each step, and substitute them wherever you see the matching example in the rest of the guide.
 
-| Access Type | Address (example) | When to Use |
+| Setting | Example used in guide | Your value |
 |---|---|---|
-| Local network | `192.168.1.100` | On home Wi-Fi or wired LAN |
-| Remote / VPN | `100.64.0.1` (Tailscale) | Anywhere outside the home network |
+| Hostname | `homenas` | |
+| Admin username | `nasadmin` | |
+| Local IP (LAN) | `192.168.1.100` | |
+| Tailscale IP | `100.64.0.1` | |
+| Alert email | `your-email@gmail.com` | |
+| NAS users | `alice`, `bob`, `carol`, `dave` | |
+| Plex claim token | `https://plex.tv/claim` (4-min expiry) | (one-time use) |
 
-Substitute your own values once you've completed the relevant steps.
+> **Two IPs to keep straight.** The **local IP** is for devices on your home Wi-Fi/LAN — you'll find it in section 5.3. The **Tailscale IP** (in the `100.x.x.x` range) is for reaching the NAS from anywhere outside your home network — section 7.2.
+
+> All values shown in code blocks are illustrative. Substitute your row above wherever they appear.
 
 ---
 
@@ -780,13 +787,13 @@ sudo systemctl start smartd
 
 ---
 
-## 10. Bonus: NAS Transfer Droplet (macOS)
+## 10. Bonus: NAS Transfer Helpers (macOS + Windows)
 
-A drag-and-drop AppleScript that `rsync`s files to the `media` share. Drop files or folders on the app icon → Terminal opens with progress → notification when done.
+Native file managers handle small SMB transfers fine, but choke on large or bulk copies. macOS Finder throws error `-8062` on transfers over a few GB. Windows File Explorer silently aborts and rolls back failed copies, with no resume.
 
-> **Why a droplet?** Finder's SMB transfer throws error `-8062` on large transfers (>4 GB or many files at once). `rsync` handles them reliably. The droplet wraps the `rsync` command so you don't have to type it every time.
+This bonus section provides drag-and-drop helpers for both platforms that wrap the right tool for the job — `rsync` on macOS, `robocopy` on Windows — so transfers are reliable, resumable, and progress-aware.
 
-### 10.1 Requirements
+### 10.1 Requirements (macOS droplet)
 
 - macOS with Script Editor (built-in)
 - Homebrew rsync — Apple's bundled `openrsync` has SMB bugs on macOS Tahoe:
@@ -977,12 +984,14 @@ If this happens repeatedly, double-check the `/etc/fstab` entry and that `mdadm.
 
 ## 12. Quick Reference
 
-### Network addresses
+### Your network addresses
 
-| Access Type | Address | When to Use |
-|---|---|---|
-| Local network | `192.168.1.100` | Home Wi-Fi or LAN |
-| Remote / VPN | `100.64.0.1` (Tailscale) | Anywhere outside the home network |
+Fill in your own values — substitute these everywhere the guide shows the example IPs.
+
+| Access Type | Example in guide | Your value | When to Use |
+|---|---|---|---|
+| Local network | `192.168.1.100` | | Home Wi-Fi or LAN |
+| Remote / VPN | `100.64.0.1` (Tailscale) | | Anywhere outside the home network |
 
 ### Common paths
 

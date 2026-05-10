@@ -13,3 +13,7 @@ HomeNAS_Setup_Guide.pages
 *.swp
 *.swo
 *~
+
+# Pandoc build artifact — PDF is generated from Markdown via `make pdf`.
+# Source of truth is HomeNAS_Setup_Guide.md.
+HomeNAS_Setup_Guide.pdf

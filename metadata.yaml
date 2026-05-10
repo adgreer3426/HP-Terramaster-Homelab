@@ -1,0 +1,43 @@
+---
+title: "Build a Home NAS"
+subtitle: "A Synology Alternative — HP Mini + TerraMaster + Debian 13 + Plex + Tailscale"
+author: ["Adam Greer"]
+date: "2026"
+keywords: [NAS, Plex, Tailscale, Samba, Debian, RAID, homelab, Synology alternative]
+titlepage: true
+titlepage-color: "1F2937"
+titlepage-text-color: "FFFFFF"
+titlepage-rule-color: "60A5FA"
+titlepage-rule-height: 2
+titlepage-logo: "cover.png"
+logo-width: "320pt"
+header-includes:
+  - |
+    ```{=latex}
+    \usepackage{fvextra}
+    \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines=true,breakanywhere=true,commandchars=\\\{\}}
+    \usepackage{etoolbox}
+    \AtBeginEnvironment{verbatim}{\fvset{breaklines=true,breakanywhere=true}}
+    \AtBeginEnvironment{longtable}{\small}
+    \sloppy
+    \emergencystretch=5em
+    \PassOptionsToPackage{hyphens}{url}
+    ```
+toc: true
+toc-own-page: true
+toc-depth: 2
+colorlinks: true
+linkcolor: MidnightBlue
+urlcolor: MidnightBlue
+book: true
+classoption:
+  - oneside
+code-block-font-size: \footnotesize
+caption-justification: centering
+footnotes-pretty: true
+disable-header-and-footer: false
+header-left: "Home NAS Setup Guide"
+footer-left: "© 2026 Adam Greer"
+footer-center: ""
+footer-right: "\\thepage"
+---
