@@ -2,7 +2,7 @@
 -- Drop files or folders onto this app to rsync them to the media share.
 -- Checks if /Volumes/media is mounted; if not, attempts to mount via SMB.
 
-property nasIP : "192.168.1.25"
+property nasIP : "192.168.1.100"
 property shareName : "media"
 property mountPoint : "/Volumes/media"
 

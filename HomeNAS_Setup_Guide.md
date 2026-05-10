@@ -16,13 +16,15 @@ By the end of this guide you'll have:
 - **Samba** file shares with per-user passwords and a shared media folder
 - **Tailscale** for secure remote access from anywhere with no router exposure
 - **Smartmontools** monitoring drive health with email alerts to your inbox
-- A drag-and-drop **macOS droplet** for fast, reliable file transfers
+- Drag-and-drop transfer helpers for **macOS** (AppleScript droplet) and **Windows** (Robocopy batch script)
+
+*Plex runs in a Docker container; Samba, Tailscale, and Smartmontools run natively on Debian. You'll need basic comfort with Docker (or willingness to copy-paste a `docker-compose.yml`) — no prior expertise required.*
 
 **Cost vs. Synology DS224+ (2-bay, 14 TB equivalent):**
 - This build (HP Mini used + TerraMaster D2-310 + 2× 8 TB drives): **roughly $400–$500**
 - Synology DS224+ + 2× 8 TB drives: **roughly $900–$1,100**
 
-Plus you own the whole stack. No proprietary OS, no per-app licensing, no surprise EOL.
+Plus you own the whole stack. No proprietary OS, no per-app licensing, no surprise end-of-life (the point at which a vendor stops releasing security updates and your hardware quietly becomes a liability).
 
 ---
 
@@ -32,8 +34,8 @@ You'll see two IPs throughout this guide. Keep them straight:
 
 | Access Type | Address (example) | When to Use |
 |---|---|---|
-| Local network | `192.168.1.25` | On home Wi-Fi or wired LAN |
-| Remote / VPN | `100.115.3.97` (Tailscale) | Anywhere outside the home network |
+| Local network | `192.168.1.100` | On home Wi-Fi or wired LAN |
+| Remote / VPN | `100.64.0.1` (Tailscale) | Anywhere outside the home network |
 
 Substitute your own values once you've completed the relevant steps.
 
@@ -83,13 +85,15 @@ You'll also need a Plex account (free), a Tailscale account (free for up to 100 
                       └─────────────────┘
 ```
 
-The HP Mini does all compute. The TerraMaster is dumb storage — Linux's `mdadm` handles the RAID in software.
+The HP Mini does all compute. The TerraMaster is just a USB-C drive bay — it has no RAID logic of its own. Linux's `mdadm` (Multiple Device Administration) handles the mirroring in software: every write is sent to **both** drives at the kernel level, and reads come from whichever drive responds first. In plain terms, the operating system itself is the RAID controller.
+
+The big practical win: there's no proprietary RAID hardware to fail or lock you in. If the HP dies tomorrow, you can plug these two drives into any Linux machine, run `sudo mdadm --assemble --scan`, and your data is right there — no rescue service, no vendor-specific tooling.
 
 ---
 
 ## 1. Initial Debian Setup
 
-This guide assumes a fresh Debian 13 ("Trixie") install on the HP Mini. The Debian installer is straightforward — pick a hostname (mine is `greer`), create your user account (mine is `agreer`), select GNOME or no desktop, and install. Use a wired ethernet connection from the start.
+This guide assumes a fresh Debian 13 ("Trixie") install on the HP Mini. The Debian installer is straightforward — pick a hostname (this guide uses `homenas` as the example), create your user account (this guide uses `nasadmin` — substitute your own throughout), select GNOME or no desktop, and install. Use a wired ethernet connection from the start.
 
 After first boot, log in and open a terminal.
 
@@ -126,7 +130,7 @@ su -
 Enter the root password, then:
 
 ```bash
-usermod -aG sudo agreer
+usermod -aG sudo nasadmin
 exit
 ```
 
@@ -147,7 +151,7 @@ sudo visudo
 Find the line `root ALL=(ALL:ALL) ALL` and add this line directly below:
 
 ```
-agreer ALL=(ALL:ALL) ALL
+nasadmin ALL=(ALL:ALL) ALL
 ```
 
 > **Why `visudo` and not `nano`?** A typo in `/etc/sudoers` locks you out of `sudo` completely — recovery requires booting into rescue mode. `visudo` syntax-checks the file before saving and refuses to write a broken config.
@@ -233,7 +237,7 @@ df -h | grep nas
 
 ## 3. Folder Structure
 
-This guide uses four NAS users (`adam`, `amanda`, `ava`, `leslie`) — substitute your own family/household members. The structure:
+This guide uses four NAS users (`alice`, `bob`, `carol`, `dave`) — substitute your own family/household members. The structure:
 
 ```
 /mnt/nas/
@@ -243,10 +247,10 @@ This guide uses four NAS users (`adam`, `amanda`, `ava`, `leslie`) — substitut
 │   ├── music/
 │   └── photos/
 ├── backups/
-│   ├── adam/
-│   ├── amanda/
-│   ├── ava/
-│   └── leslie/
+│   ├── alice/
+│   ├── bob/
+│   ├── carol/
+│   └── dave/
 ├── shared/
 └── plex/
     └── config/
@@ -255,9 +259,9 @@ This guide uses four NAS users (`adam`, `amanda`, `ava`, `leslie`) — substitut
 Create it:
 
 ```bash
-sudo chown -R agreer:agreer /mnt/nas
+sudo chown -R nasadmin:nasadmin /mnt/nas
 mkdir -p /mnt/nas/media/{movies,tv,music,photos}
-mkdir -p /mnt/nas/backups/{adam,amanda,ava,leslie}
+mkdir -p /mnt/nas/backups/{alice,bob,carol,dave}
 mkdir -p /mnt/nas/shared
 mkdir -p /mnt/nas/plex/config
 ```
@@ -272,7 +276,7 @@ Plex runs in Docker. Samba runs natively (covered in section 6).
 
 ```bash
 sudo apt install -y docker.io docker-compose
-sudo usermod -aG docker agreer
+sudo usermod -aG docker nasadmin
 ```
 
 **Fully log out and log back in**, then verify:
@@ -308,8 +312,8 @@ sudo systemctl restart docker
 ### 5.1 Create the docker-compose file
 
 ```bash
-mkdir -p /home/agreer/docker
-nano /home/agreer/docker/docker-compose.yml
+mkdir -p /home/nasadmin/docker
+nano /home/nasadmin/docker/docker-compose.yml
 ```
 
 Paste in:
@@ -337,7 +341,7 @@ services:
 
 Save (Ctrl+O, Enter, Ctrl+X).
 
-> **About `PUID=1000` and `PGID=1000`:** This makes the container run as your `agreer` user (UID 1000), so files Plex writes are owned by you and write back cleanly to `/mnt/nas`. Confirm your user's IDs match with `id agreer` — if they don't, change PUID/PGID accordingly.
+> **About `PUID=1000` and `PGID=1000`:** This makes the container run as your `nasadmin` user (UID 1000), so files Plex writes are owned by you and write back cleanly to `/mnt/nas`. Confirm your user's IDs match with `id nasadmin` — if they don't, change PUID/PGID accordingly.
 >
 > **About the `PLEX_CLAIM` token:** Get a fresh token from `https://plex.tv/claim` immediately before starting the container. The token expires in 4 minutes. After the server is claimed, you can remove the `PLEX_CLAIM` line entirely.
 
@@ -346,7 +350,7 @@ Save (Ctrl+O, Enter, Ctrl+X).
 Get your claim token from `https://plex.tv/claim`, paste it into the compose file replacing `<paste-your-token-here>`, save, and start:
 
 ```bash
-cd /home/agreer/docker
+cd /home/nasadmin/docker
 docker compose up -d
 ```
 
@@ -364,7 +368,7 @@ Look for `Server claimed successfully`.
 ip addr show | grep "inet "
 ```
 
-Look for an address like `192.168.1.25`. Set this as a DHCP reservation in your router so it never changes.
+Look for an address like `192.168.1.100`. Set this as a DHCP reservation in your router so it never changes.
 
 ### 5.4 Complete the Plex setup wizard
 
@@ -374,7 +378,7 @@ On any device on your home network, open:
 http://<your-hp-ip>:32400/web
 ```
 
-(e.g. `http://192.168.1.25:32400/web`)
+(e.g. `http://192.168.1.100:32400/web`)
 
 Sign in with your Plex account and add libraries:
 
@@ -395,6 +399,25 @@ Plex matches metadata based on filenames:
 
 Rename before copying to save Plex from guessing.
 
+### 5.6 Recommended: Plex Pass (Lifetime)
+
+Plex's free tier covers the basics, but **Plex Pass** unlocks the features that make a self-hosted media server genuinely competitive with streaming services. For a server you intend to run for years, the lifetime pass is the obvious choice.
+
+**What you get:**
+
+- **Hardware-accelerated transcoding** — your HP Mini uses its integrated GPU to transcode 4K and high-bitrate video on the fly to weaker client devices (older phones, slow connections, Apple TVs). Without this, transcoding falls back to software on the CPU and quickly bottlenecks on multi-stream households.
+- **Mobile sync / offline downloads** — pre-download movies and shows to a phone or laptop for flights, road trips, and dead zones.
+- **Plexamp** — a polished premium music player with library-aware features (smart playlists, sonic analysis, loudness leveling) that's worth the price on its own if you keep a serious music library.
+- **Live TV & DVR** — pair an HDHomeRun or USB tuner with Plex to record over-the-air broadcasts to your NAS.
+- **Skip intro / skip credits** — automatic on supported shows and films.
+- **Premium photo features** — on-device face recognition and smart albums for the Photos library.
+- **Multiple users with full home features** (Home, Friends, parental controls).
+- **Earlier access** to new features and beta builds.
+
+**Pricing (as of writing):** monthly ~$5, yearly ~$40, lifetime ~$120 (one-time). The lifetime tier breaks even versus the monthly plan in roughly 24 months — and Plex has historically honored lifetime passes through every major version change since 2014.
+
+Sign up at `plex.tv/plex-pass` while logged into your Plex account. Once active, Plex Pass features are tied to your account and roll across every device automatically.
+
 ---
 
 ## 6. Install Samba (Native)
@@ -412,11 +435,11 @@ sudo apt install -y samba samba-common-bin
 For each NAS user, create a system user with no shell login, then set a Samba password:
 
 ```bash
-sudo useradd -M -s /usr/sbin/nologin adam
-sudo smbpasswd -a adam
+sudo useradd -M -s /usr/sbin/nologin alice
+sudo smbpasswd -a alice
 ```
 
-Repeat for `amanda`, `ava`, `leslie` (or whatever names you're using).
+Repeat for `bob`, `carol`, `dave` (or whatever names you're using).
 
 ### 6.3 Configure shares
 
@@ -434,39 +457,39 @@ Append at the bottom:
    browseable = yes
    read only = no
    guest ok = no
-   valid users = adam, amanda, ava, leslie
+   valid users = alice, bob, carol, dave
    create mask = 0664
    directory mask = 0775
 
-[adam]
-   path = /mnt/nas/backups/adam
+[alice]
+   path = /mnt/nas/backups/alice
    browseable = yes
    read only = no
-   valid users = adam
+   valid users = alice
    create mask = 0664
    directory mask = 0775
 
-[amanda]
-   path = /mnt/nas/backups/amanda
+[bob]
+   path = /mnt/nas/backups/bob
    browseable = yes
    read only = no
-   valid users = amanda
+   valid users = bob
    create mask = 0664
    directory mask = 0775
 
-[ava]
-   path = /mnt/nas/backups/ava
+[carol]
+   path = /mnt/nas/backups/carol
    browseable = yes
    read only = no
-   valid users = ava
+   valid users = carol
    create mask = 0664
    directory mask = 0775
 
-[leslie]
-   path = /mnt/nas/backups/leslie
+[dave]
+   path = /mnt/nas/backups/dave
    browseable = yes
    read only = no
-   valid users = leslie
+   valid users = dave
    create mask = 0664
    directory mask = 0775
 ```
@@ -474,13 +497,13 @@ Append at the bottom:
 ### 6.4 Set ownership on the shared folders
 
 ```bash
-sudo chown -R agreer:agreer /mnt/nas/media
+sudo chown -R nasadmin:nasadmin /mnt/nas/media
 sudo chmod -R 775 /mnt/nas/media
 
-sudo chown adam:adam /mnt/nas/backups/adam
-sudo chown amanda:amanda /mnt/nas/backups/amanda
-sudo chown ava:ava /mnt/nas/backups/ava
-sudo chown leslie:leslie /mnt/nas/backups/leslie
+sudo chown alice:alice /mnt/nas/backups/alice
+sudo chown bob:bob /mnt/nas/backups/bob
+sudo chown carol:carol /mnt/nas/backups/carol
+sudo chown dave:dave /mnt/nas/backups/dave
 sudo chmod 700 /mnt/nas/backups/*
 ```
 
@@ -499,7 +522,7 @@ sudo systemctl enable smbd nmbd        # auto-start on boot
 In Finder, press **Cmd+K**, then enter:
 
 ```
-smb://192.168.1.25
+smb://192.168.1.100
 ```
 
 Click Connect, enter the appropriate username and password, and select the share.
@@ -507,7 +530,7 @@ Click Connect, enter the appropriate username and password, and select the share
 To connect directly to a specific share (skipping the picker):
 
 ```
-smb://192.168.1.25/media
+smb://192.168.1.100/media
 ```
 
 ### 6.7 Connect from Windows
@@ -515,7 +538,7 @@ smb://192.168.1.25/media
 In File Explorer, type into the address bar:
 
 ```
-\\192.168.1.25\media
+\\192.168.1.100\media
 ```
 
 Enter credentials when prompted.
@@ -552,7 +575,7 @@ Find the Tailscale IP:
 tailscale ip -4
 ```
 
-You'll get something like `100.115.3.97`. This IP is permanent for this device.
+You'll get something like `100.64.0.1`. This IP is permanent for this device.
 
 ### 7.3 Advertise your home subnet
 
@@ -606,7 +629,7 @@ Tailscale is great for personal remote access. But if you want to share your Ple
    - **Service Type:** `TCP`
    - **External Starting Port:** `32400`
    - **External Ending Port:** `32400`
-   - **Internal IP Address:** `192.168.1.25`
+   - **Internal IP Address:** `192.168.1.100`
    - **Internal Starting Port:** `32400`
    - **Internal Ending Port:** `32400`
 5. Click **Apply**
@@ -665,11 +688,11 @@ sudo nano /etc/smartd.conf
 Comment out the existing `DEVICESCAN` line by adding `#` to the start. Then add at the bottom:
 
 ```
-/dev/sda -a -o on -S on -s (S/../.././02|L/../../6/03) -m agreer26@gmail.com -M exec /usr/share/smartmontools/smartd-runner
-/dev/sdb -a -o on -S on -s (S/../.././02|L/../../6/03) -m agreer26@gmail.com -M exec /usr/share/smartmontools/smartd-runner
+/dev/sda -a -o on -S on -s (S/../.././02|L/../../6/03) -m your-email@gmail.com -M exec /usr/share/smartmontools/smartd-runner
+/dev/sdb -a -o on -S on -s (S/../.././02|L/../../6/03) -m your-email@gmail.com -M exec /usr/share/smartmontools/smartd-runner
 ```
 
-Replace `agreer26@gmail.com` with your email. This schedules:
+Replace `your-email@gmail.com` with your email. This schedules:
 
 - A **short test every day at 2 AM**
 - A **long test every Saturday at 3 AM**
@@ -699,19 +722,19 @@ sudo nano /etc/ssmtp/ssmtp.conf
 Replace everything with:
 
 ```
-root=agreer26@gmail.com
+root=your-email@gmail.com
 mailhub=smtp.gmail.com:587
-AuthUser=agreer26@gmail.com
+AuthUser=your-email@gmail.com
 AuthPass=<paste-your-16-char-app-password-here>
 UseTLS=YES
 UseSTARTTLS=YES
-hostname=greer
+hostname=homenas
 ```
 
 Test:
 
 ```bash
-echo "Test from NAS" | mail -s "NAS Test Email" agreer26@gmail.com
+echo "Test from NAS" | mail -s "NAS Test Email" your-email@gmail.com
 ```
 
 Check your Gmail. If it arrived, you're set.
@@ -791,7 +814,68 @@ brew install rsync
 
 The droplet auto-mounts the `media` share if not mounted, excludes macOS metadata (`.DS_Store`, `._*`, `.Spotlight-V100`, `.Trashes`), and copies (doesn't move) files.
 
-To target a different share (e.g. `adam`), edit the `shareName` property at the top of the script and re-export.
+To target a different share (e.g. `alice`), edit the `shareName` property at the top of the script and re-export.
+
+### 10.4 Windows equivalent (Robocopy batch script)
+
+Windows users can build the same drag-and-drop workflow using **Robocopy** — built into Windows since Vista, and far more reliable than File Explorer for large SMB transfers (it has built-in retry, resume, and progress).
+
+**Step 1 — Map the share to a drive letter.**
+
+In File Explorer, right-click "This PC" → **Map network drive**:
+- **Drive letter:** `Z:` (or any free letter)
+- **Folder:** `\\192.168.1.100\media`
+- Check **Reconnect at sign-in**
+- Check **Connect using different credentials**, then enter your Samba username and password
+
+**Step 2 — Create `NAS_Transfer.bat` on your desktop:**
+
+```batch
+@echo off
+setlocal EnableDelayedExpansion
+set "DEST=Z:\"
+
+if "%~1"=="" (
+  echo Drag files or folders onto this script to copy them to the NAS.
+  pause
+  exit /b
+)
+
+:loop
+if "%~1"=="" goto done
+if exist "%~1\*" (
+  rem Folder: copy contents recursively into a same-named subfolder on the NAS
+  robocopy "%~1" "%DEST%%~n1" /E /Z /R:3 /W:5 /XF .DS_Store ._* desktop.ini Thumbs.db /XD .Spotlight-V100 .Trashes
+) else (
+  rem Single file
+  robocopy "%~dp1." "%DEST%" "%~nx1" /Z /R:3 /W:5
+)
+shift
+goto loop
+
+:done
+echo.
+echo Transfer complete.
+timeout /t 5
+```
+
+**Step 3 — Use it.**
+
+Drag any file or folder onto `NAS_Transfer.bat`. A console window opens showing Robocopy progress; it auto-closes 5 seconds after completion. Pin the script to your taskbar or Start menu by right-clicking → "Pin to Start" for one-click drops.
+
+**Robocopy flags used:**
+
+| Flag | What it does |
+|---|---|
+| `/E` | Copy subdirectories, including empty ones |
+| `/Z` | Restartable mode — resumes interrupted transfers |
+| `/R:3 /W:5` | Retry up to 3 times, waiting 5 seconds between |
+| `/XF` | Exclude files (macOS/Windows metadata) |
+| `/XD` | Exclude directories (macOS metadata) |
+
+**To target a different share** (e.g. your private backup folder), change the `set "DEST=Z:\"` line to point at the right drive letter, or use a UNC path directly: `set "DEST=\\192.168.1.100\alice\"`.
+
+If Windows asks for credentials every reboot, open **Credential Manager → Windows Credentials → Add a Windows credential** and store your NAS login there — Windows will then re-authenticate the share automatically at sign-in.
 
 ---
 
@@ -840,7 +924,7 @@ If users can read but not write to shares after a reboot:
 sudo chmod -R 777 /mnt/nas
 
 # Better fix (owner+group writable, others read-only):
-sudo chown -R agreer:agreer /mnt/nas
+sudo chown -R nasadmin:nasadmin /mnt/nas
 sudo chmod -R 775 /mnt/nas
 ```
 
@@ -876,7 +960,7 @@ Checklist:
 The compose file uses `restart: unless-stopped`, so containers should come back automatically. If they don't:
 
 ```bash
-cd /home/agreer/docker
+cd /home/nasadmin/docker
 docker compose up -d
 ```
 
@@ -897,8 +981,8 @@ If this happens repeatedly, double-check the `/etc/fstab` entry and that `mdadm.
 
 | Access Type | Address | When to Use |
 |---|---|---|
-| Local network | `192.168.1.25` | Home Wi-Fi or LAN |
-| Remote / VPN | `100.115.3.97` (Tailscale) | Anywhere outside the home network |
+| Local network | `192.168.1.100` | Home Wi-Fi or LAN |
+| Remote / VPN | `100.64.0.1` (Tailscale) | Anywhere outside the home network |
 
 ### Common paths
 
@@ -908,7 +992,7 @@ If this happens repeatedly, double-check the `/etc/fstab` entry and that `mdadm.
 | `/mnt/nas/media` | Plex media root (movies, tv, music, photos) |
 | `/mnt/nas/backups/<user>` | Per-user private backup folder |
 | `/mnt/nas/plex/config` | Plex database and metadata |
-| `/home/agreer/docker/docker-compose.yml` | Plex compose file |
+| `/home/nasadmin/docker/docker-compose.yml` | Plex compose file |
 | `/etc/samba/smb.conf` | Samba share config |
 | `/etc/smartd.conf` | Drive health monitoring config |
 | `/etc/ssmtp/ssmtp.conf` | Outgoing mail config |
@@ -933,11 +1017,11 @@ If this happens repeatedly, double-check the `/etc/fstab` entry and that `mdadm.
 
 | Client | Address |
 |---|---|
-| Mac (Finder) | `Cmd+K → smb://192.168.1.25` |
-| Mac, direct share | `smb://192.168.1.25/media` |
-| Windows | `\\192.168.1.25\media` |
-| Plex Web (local) | `http://192.168.1.25:32400/web` |
-| Plex Web (remote, Tailscale) | `http://100.115.3.97:32400/web` |
+| Mac (Finder) | `Cmd+K → smb://192.168.1.100` |
+| Mac, direct share | `smb://192.168.1.100/media` |
+| Windows | `\\192.168.1.100\media` |
+| Plex Web (local) | `http://192.168.1.100:32400/web` |
+| Plex Web (remote, Tailscale) | `http://100.64.0.1:32400/web` |
 
 ---
 
