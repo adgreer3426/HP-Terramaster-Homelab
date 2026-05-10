@@ -1,0 +1,15 @@
+# Raw Claude.ai chat export — contains personal back-and-forth and secrets.
+# Never commit. Source of truth for the guide is HomeNAS_Setup_Guide.md.
+HomeNAS_Setup.md
+
+# Original Pages source — superseded by HomeNAS_Setup_Guide.md.
+HomeNAS_Setup_Guide.pages
+
+# macOS junk
+.DS_Store
+._*
+
+# Editor backups
+*.swp
+*.swo
+*~
