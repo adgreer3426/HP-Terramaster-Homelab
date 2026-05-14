@@ -17,3 +17,6 @@ HomeNAS_Setup_Guide.pages
 # Pandoc build artifact — PDF is generated from Markdown via `make pdf`.
 # Source of truth is HomeNAS_Setup_Guide.md.
 HomeNAS_Setup_Guide.pdf
+
+# Buyer-facing bundle — built via `make zip`.
+HomeNAS_Setup_Guide.zip
