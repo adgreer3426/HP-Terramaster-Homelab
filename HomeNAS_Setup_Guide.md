@@ -283,7 +283,7 @@ sudo apt install -y mdadm
 
 ### 2.3 Create the RAID 1 array
 
-> ⚠️ **STOP. This step is destructive.** `mdadm --create` will erase whatever is on the target devices. Before running it, confirm with `lsblk` that:
+> **STOP — this step is destructive.** `mdadm --create` will erase whatever is on the target devices. Before running it, confirm with `lsblk` that:
 >
 > - `/dev/sda` and `/dev/sdb` are the two **TerraMaster** drives (each showing the full HDD capacity, e.g. `7.3T`, with no mounted partitions)
 > - Your **internal** drive (with Debian on it) is a different device — typically `nvme0n1`
@@ -1249,13 +1249,13 @@ This section covers what the rest of the guide doesn't: how to back up the NAS i
 
 | Threat | Protected? | Mitigation |
 |---|---|---|
-| Single drive failure | ✅ | RAID 1 (§2). Replace the failed drive and resync. |
-| Power outage / unclean shutdown | ⚠️ partial | ext4 is journaled, but a UPS is strongly recommended for an always-on server. A $50 APC Back-UPS gives you safe-shutdown time. |
-| Accidental deletion | ❌ | Mirrors instantly to both drives. You need a backup. |
-| Ransomware / encryption malware | ❌ | Same — backups are the only answer. |
-| Fire, theft, flood, lightning | ❌ | Offsite backup or rotated external drive. |
-| Network compromise (LAN intruder) | ⚠️ partial | Samba auth gates file access; SSH key auth (§1.5) gates shell access. No firewall by default. |
-| Remote access compromise | ✅ mostly | Tailscale is zero-trust by default — only devices you've explicitly added to your tailnet can reach the HP. Plex's port 32400 forward is the only public attack surface; it sits behind Plex's auth. |
+| Single drive failure | **Yes** | RAID 1 (§2). Replace the failed drive and resync. |
+| Power outage / unclean shutdown | **Partial** | ext4 is journaled, but a UPS is strongly recommended for an always-on server. A $50 APC Back-UPS gives you safe-shutdown time. |
+| Accidental deletion | **No** | Mirrors instantly to both drives. You need a backup. |
+| Ransomware / encryption malware | **No** | Same — backups are the only answer. |
+| Fire, theft, flood, lightning | **No** | Offsite backup or rotated external drive. |
+| Network compromise (LAN intruder) | **Partial** | Samba auth gates file access; SSH key auth (§1.5) gates shell access. No firewall by default. |
+| Remote access compromise | **Mostly** | Tailscale is zero-trust by default — only devices you've explicitly added to your tailnet can reach the HP. Plex's port 32400 forward is the only public attack surface; it sits behind Plex's auth. |
 
 ### 13.2 Back up the NAS to cloud storage (recommended)
 
