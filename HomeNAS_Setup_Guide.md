@@ -39,6 +39,7 @@ Every IP, username, hostname, and email in this guide is a **concrete example**,
 | Local IP (LAN) | `192.168.1.100` | |
 | Tailscale IP | `100.64.0.1` | |
 | Alert email | `your-email@gmail.com` | |
+| Timezone | `America/Chicago` | |
 | NAS users | `alice`, `bob`, `carol`, `dave` | |
 | Plex claim token | `https://plex.tv/claim` (4-min expiry) | (one-time use) |
 
@@ -191,6 +192,68 @@ sudo apt update
 sudo apt upgrade -y
 ```
 
+### 1.4 Enable automatic security updates
+
+For a server you intend to run for years, you want security patches installed automatically — not waiting on you to log in and run `apt upgrade`.
+
+```bash
+sudo apt install -y unattended-upgrades apt-listchanges
+sudo dpkg-reconfigure --priority=low unattended-upgrades
+```
+
+When prompted, answer **Yes** to automatically install stable security updates. Verify it's enabled:
+
+```bash
+systemctl status unattended-upgrades
+```
+
+By default this installs **security** updates only — not general package upgrades — and avoids reboots. That's the right balance for an always-on NAS.
+
+### 1.5 Harden SSH (optional but recommended)
+
+You'll be SSHing into the HP often. If you only ever reach it from your Tailscale network, the existing password auth is fine. But if SSH is exposed to your LAN (and especially if your router ever forwards port 22), switch to key-based auth:
+
+**On your laptop**, generate an SSH key if you don't have one:
+
+```bash
+ssh-keygen -t ed25519 -C "homenas access"
+```
+
+(Press Enter through the prompts; optionally set a passphrase.)
+
+**Copy your public key to the HP:**
+
+```bash
+ssh-copy-id nasadmin@192.168.1.100
+```
+
+**Test that key auth works:**
+
+```bash
+ssh nasadmin@192.168.1.100
+```
+
+If you land at a prompt without typing a password, key auth is working. Now disable password login on the HP:
+
+```bash
+sudo nano /etc/ssh/sshd_config.d/99-hardening.conf
+```
+
+Paste in:
+
+```
+PasswordAuthentication no
+PermitRootLogin no
+```
+
+Reload SSH:
+
+```bash
+sudo systemctl reload ssh
+```
+
+> **Don't lock yourself out.** Keep your current SSH session open while you reload, and open a **second** terminal to verify the new key-only auth works before closing the first. If you misplace your private key later, you'll need physical access to the HP to recover.
+
 ---
 
 ## 2. Set Up RAID 1 with mdadm
@@ -268,6 +331,17 @@ sudo reboot
 df -h | grep nas
 ```
 
+### 2.6 RAID is not a backup
+
+It's worth saying clearly before you start putting irreplaceable files on this array: **RAID 1 protects against a single drive failing, and nothing else.** It does not protect against:
+
+- Accidental deletion (`rm -rf` on the wrong directory mirrors instantly to both drives)
+- Ransomware or accidental encryption
+- File-system corruption from a bad shutdown
+- Fire, theft, lightning, or the whole HP getting fried
+
+For anything you can't afford to lose — family photos, business records, original creative work — pair this NAS with a real backup. See **§13 Backups & Hardening** at the end of the guide.
+
 ---
 
 ## 3. Folder Structure
@@ -302,6 +376,8 @@ mkdir -p /mnt/nas/plex/config
 ```
 
 > **Why this layout?** `media/` is read-shared with everyone for Plex. Each user gets a private `backups/` folder for phone/laptop backups. `shared/` is for files everyone needs to read and write. `plex/config/` holds Plex's database — keeping it on the RAID array means it survives an HP failure without losing your library metadata.
+
+> **About ownership:** these folders are created owned by your admin user for now. In §6.4 you'll re-chown each `backups/<user>` folder to that user once the Samba accounts exist, so each person owns their own backup directory.
 
 ---
 
@@ -378,7 +454,11 @@ services:
 
 Save (Ctrl+O, Enter, Ctrl+X).
 
-> **About `PUID=1000` and `PGID=1000`:** This makes the container run as your `nasadmin` user (UID 1000), so files Plex writes are owned by you and write back cleanly to `/mnt/nas`. Confirm your user's IDs match with `id nasadmin` — if they don't, change PUID/PGID accordingly.
+> **Three things to substitute in this compose file:**
+>
+> - **`/home/nasadmin/docker/...` paths** — replace `nasadmin` with your admin username. Or just use `~/docker` (your shell expands `~` to your home directory).
+> - **`TZ=America/Chicago`** — set to your timezone in `Region/City` format (`America/New_York`, `Europe/London`, `Asia/Tokyo`, etc.). Find yours with `timedatectl` on the HP, or browse the full list at `https://en.wikipedia.org/wiki/List_of_tz_database_time_zones`. This affects when Plex schedules library scans and trash maintenance.
+> - **`PUID=1000` / `PGID=1000`** — these make the container run as your `nasadmin` user (UID 1000) so files Plex writes are owned by you. Confirm your IDs with `id nasadmin`; if they're different, change PUID/PGID accordingly.
 >
 > **About the `PLEX_CLAIM` token:** Get a fresh token from `https://plex.tv/claim` immediately before starting the container. The token expires in 4 minutes. After the server is claimed, you can remove the `PLEX_CLAIM` line entirely.
 
@@ -428,13 +508,19 @@ Sign in with your Plex account and add libraries:
 
 ### 5.5 Naming media for Plex
 
-Plex matches metadata based on filenames:
+Plex matches metadata from filenames. Stick to these formats and matches will be near-100%:
 
-- **Movies:** `Movie Name (2024).mp4`
-- **TV Shows:** `Show Name/Season 01/Show Name S01E01.mp4`
-- **Music:** organized by artist/album folders
+- **Movies:** `Movie Name (YEAR).ext` — e.g. `Blade Runner (1982).mkv`
+- **TV Shows:** `Show Name/Season 01/Show Name - S01E01 - Episode Title.ext`
+- **Music:** organized by `Artist/Album/Track #. Title.ext` folder structure
 
-Rename before copying to save Plex from guessing.
+> **Strict format rules:**
+>
+> - Use capital `S` and `E` for season/episode codes — `S01E01`, not `01x01` or `s1e1`. Plex won't match the other forms reliably.
+> - Always include the release year for movies, in parentheses. Identical titles (e.g. two films named *Heat*) are otherwise ambiguous.
+> - Keep each show in its own top-level folder. Don't mix multiple shows in a single directory.
+
+Rename before copying — re-matching mislabeled files after the fact is much slower than getting it right on import.
 
 ### 5.6 Recommended: Plex Pass (Lifetime)
 
@@ -1152,6 +1238,105 @@ Fill in your own values — substitute these everywhere the guide shows the exam
 | Windows | `\\192.168.1.100\media` |
 | Plex Web (local) | `http://192.168.1.100:32400/web` |
 | Plex Web (remote, Tailscale) | `http://100.64.0.1:32400/web` |
+
+---
+
+## 13. Backups & Hardening
+
+This section covers what the rest of the guide doesn't: how to back up the NAS itself, and the security posture you've ended up with.
+
+### 13.1 What this build protects against (and what it doesn't)
+
+| Threat | Protected? | Mitigation |
+|---|---|---|
+| Single drive failure | ✅ | RAID 1 (§2). Replace the failed drive and resync. |
+| Power outage / unclean shutdown | ⚠️ partial | ext4 is journaled, but a UPS is strongly recommended for an always-on server. A $50 APC Back-UPS gives you safe-shutdown time. |
+| Accidental deletion | ❌ | Mirrors instantly to both drives. You need a backup. |
+| Ransomware / encryption malware | ❌ | Same — backups are the only answer. |
+| Fire, theft, flood, lightning | ❌ | Offsite backup or rotated external drive. |
+| Network compromise (LAN intruder) | ⚠️ partial | Samba auth gates file access; SSH key auth (§1.5) gates shell access. No firewall by default. |
+| Remote access compromise | ✅ mostly | Tailscale is zero-trust by default — only devices you've explicitly added to your tailnet can reach the HP. Plex's port 32400 forward is the only public attack surface; it sits behind Plex's auth. |
+
+### 13.2 Back up the NAS to cloud storage (recommended)
+
+The cheapest credible offsite backup for a multi-TB home NAS is **Backblaze B2** + `rclone`. As of writing, B2 is ~$6/TB/month with no egress fees for restores up to the amount you store.
+
+**One-time setup:**
+
+```bash
+sudo apt install -y rclone
+rclone config
+```
+
+Follow the prompts: choose `n` for new remote, name it `b2`, pick the Backblaze B2 provider, and paste in an Application Key from the B2 web console (`https://secure.backblaze.com/app_keys.htm`).
+
+**Daily backup job** — append to `crontab -e`:
+
+```
+0 3 * * * /usr/bin/rclone sync /mnt/nas/backups b2:my-homenas-backups --transfers=4 --log-file=/var/log/rclone.log
+```
+
+This runs every day at 3 AM and mirrors `/mnt/nas/backups` (the family's private folders) to B2. Adjust the paths to include whatever else you can't afford to lose — `media/photos`, `media/music`, etc. Don't sync `media/movies` and `media/tv` unless you really want to pay for cloud storage of a Plex library; those are easier to re-acquire than family photos.
+
+> **About `sync` vs. `copy`:** `rclone sync` makes the destination match the source — files you delete locally also delete remotely. That's usually what you want, but it means an `rm` mistake on the NAS will be propagated to B2 within 24 hours. For true protection against accidental deletion, **enable B2 Versioning** in the bucket settings (it costs a bit more but keeps deleted versions for a retention window you set).
+
+### 13.3 Alternative: rotated external drive
+
+If you'd rather not pay for cloud storage, an 8 TB external USB drive ($120–$150) used in rotation is a reasonable offsite backup:
+
+```bash
+# Plug in external drive, identify it with lsblk, mount it:
+sudo mount /dev/sdc1 /mnt/external
+
+# Sync the critical bits:
+sudo rsync -avh --progress /mnt/nas/backups /mnt/external/
+sudo rsync -avh --progress /mnt/nas/media/photos /mnt/external/
+
+# Unmount and store offsite:
+sudo umount /mnt/external
+```
+
+Buy **two** external drives and rotate them — keep one at home, one at a friend's house or in a fireproof safe. Swap them monthly. A single backup drive that lives in the same room as the NAS only protects against drive failure, not fire/theft.
+
+### 13.4 Firewall: not configured by default, and that's OK for most homes
+
+This build does **not** install a firewall (UFW, nftables, etc.) on the HP itself. The HP is protected by:
+
+1. **Your router's NAT** — incoming traffic from the internet only reaches the HP on port 32400 (the one you forwarded for Plex in §8).
+2. **Tailscale's auth model** — your tailnet is private; nothing on it is reachable from outside without being added to your account.
+3. **Per-service auth** — Samba shares require username + password; SSH (after §1.5) requires a key; Plex requires a logged-in Plex account.
+
+If you want belt-and-suspenders, install UFW:
+
+```bash
+sudo apt install -y ufw
+sudo ufw allow from 192.168.1.0/24                       # trust the LAN
+sudo ufw allow in on tailscale0                          # trust the tailnet
+sudo ufw allow 32400/tcp                                 # Plex remote access
+sudo ufw enable
+```
+
+This blocks anything from outside your LAN or tailnet, while leaving Plex's public port open. For most home setups this is overkill — the router and Tailscale already provide that isolation — but it's harmless.
+
+### 13.5 Optional: fail2ban for SSH
+
+If you've exposed SSH to the LAN (and even more so if you've ever forwarded port 22 on your router — don't), install `fail2ban` to auto-ban IPs that hammer SSH with bad credentials:
+
+```bash
+sudo apt install -y fail2ban
+sudo systemctl enable --now fail2ban
+```
+
+Defaults are sane: 5 bad attempts in 10 minutes earns a 10-minute ban. Tune `/etc/fail2ban/jail.local` if you want longer bans.
+
+### 13.6 The yearly checkup
+
+Once a year, take 10 minutes to:
+
+- Reboot the HP and confirm everything comes back up (`systemctl status smartd`, `docker ps`, `df -h | grep nas`)
+- Test a restore from your offsite backup — pull a single random file from B2 or the external drive and confirm it opens. **A backup you've never tested is not a backup.**
+- Check drive age: `sudo smartctl -a /dev/sda | grep "Power_On_Hours"` — once a NAS-grade drive crosses 40,000 hours (about 4.5 years), start planning a proactive replacement.
+- Re-read this section. Your threat model may have changed.
 
 ---
 
