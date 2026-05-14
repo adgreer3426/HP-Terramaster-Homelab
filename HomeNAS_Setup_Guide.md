@@ -51,15 +51,52 @@ Every IP, username, hostname, and email in this guide is a **concrete example**,
 
 ## Bill of Materials
 
-| Item | Notes |
-|---|---|
-| HP Mini PC (any recent 8th-gen Intel or newer) | Used on eBay for $150–$250. Needs at least 8 GB RAM and a 256 GB internal SSD. |
-| TerraMaster D2-310 (2-bay USB-C DAS) | Or any USB-C DAS that supports JBOD/raw passthrough. Avoid hardware-RAID enclosures — we want the drives raw. |
-| 2× HDDs of matching capacity | 8 TB or larger, NAS-grade (WD Red Plus, Seagate IronWolf). Two identical drives. |
-| USB-C cable | A spare is worth keeping on hand — it's the single point of failure between server and storage. |
-| Ethernet cable | Wired connection strongly preferred for a NAS. |
+<!--
+AFFILIATE LINK WORKFLOW (for the guide author):
+1. Enroll in Amazon Associates: https://affiliate-program.amazon.com/
+2. Once approved, you'll have a tracking tag like `mynas-20`.
+3. For each Amazon item below, find the canonical product page on amazon.com,
+   copy the 10-char ASIN from the URL, then in this file:
+     - Replace `REPLACE-WITH-PRODUCT-ID` with the ASIN
+     - Replace `YOUR-TAG-20` with your real tag (in every link)
+4. (Optional) Enroll in the eBay Partner Network for the HP Mini search link.
+5. Rebuild the PDF: `make pdf`
+-->
 
-You'll also need a Plex account (free), a Tailscale account (free for up to 100 devices), and a Gmail account (for SMART email alerts).
+Prices reflect typical US pricing in early 2026 and assume buying the HP Mini used, storage new. Adjust for your region.
+
+### Required
+
+| Item | Approx. price (USD) | Notes & link |
+|---|---|---|
+| **HP Mini PC** (8th-gen Intel or newer) | $150–$250 used | Search **"HP ProDesk 600 G4 Mini"** or **"HP EliteDesk 800 G4 Mini"** — typical office-decommissioned units with more than enough power for Plex. Minimum specs: 8 GB RAM, 256 GB internal SSD. [Search eBay](https://www.ebay.com/sch/i.html?_nkw=HP+ProDesk+600+G4+Mini) |
+| **TerraMaster D2-310** (2-bay USB-C DAS) | ~$130 new | Or any USB-C DAS that supports JBOD / raw passthrough. **Avoid hardware-RAID enclosures** — we want Linux `mdadm` to manage the drives, not the enclosure. [Amazon](https://www.amazon.com/dp/REPLACE-WITH-PRODUCT-ID/?tag=YOUR-TAG-20) |
+| **2× NAS-grade HDDs, 8 TB each** | $150–$180 each | Two identical drives: **WD Red Plus 8 TB** (CMR — not the SMR variant), **Seagate IronWolf 8 TB**, or **Toshiba N300 8 TB**. Desktop drives (WD Blue, Seagate BarraCuda) aren't rated for 24/7 operation and will not last in a NAS. [WD Red Plus](https://www.amazon.com/dp/REPLACE-WITH-PRODUCT-ID/?tag=YOUR-TAG-20) · [Seagate IronWolf](https://www.amazon.com/dp/REPLACE-WITH-PRODUCT-ID/?tag=YOUR-TAG-20) |
+| **USB-C cable** (data, 5 Gbps min) | ~$10 | The only physical link between server and storage — keep a spare on hand. [Amazon](https://www.amazon.com/dp/REPLACE-WITH-PRODUCT-ID/?tag=YOUR-TAG-20) |
+| **Ethernet cable** (Cat 6, 6 ft) | ~$8 | A wired connection is strongly preferred — Wi-Fi adds variable latency to large transfers and 4K streams. [Amazon](https://www.amazon.com/dp/REPLACE-WITH-PRODUCT-ID/?tag=YOUR-TAG-20) |
+
+**Required total: roughly $450–$650** depending on used-HP pricing.
+
+### Strongly recommended add-ons
+
+| Item | Approx. price (USD) | Why |
+|---|---|---|
+| **APC Back-UPS BE850M2** (or similar 850 VA) | ~$130 | An always-on server needs a small UPS so it can ride out brownouts and shut down cleanly during outages — prevents file-system corruption and forced `mdadm` resyncs. See §13.1. [Amazon](https://www.amazon.com/dp/REPLACE-WITH-PRODUCT-ID/?tag=YOUR-TAG-20) |
+| **2× 8 TB external USB-C drives** (rotation) | ~$140 each | Offsite backup rotation as described in §13.3. Buy two and swap them between home and a friend's house or a fireproof safe. WD Elements or Seagate Expansion are the standard choices. [WD Elements 8 TB](https://www.amazon.com/dp/REPLACE-WITH-PRODUCT-ID/?tag=YOUR-TAG-20) |
+| **Plex Pass (Lifetime)** | $120 one-time | Hardware-accelerated transcoding, mobile downloads, Plexamp, Skip Intro, Live TV + DVR. See §5.6. (No affiliate program — buy direct.) [plex.tv/plex-pass](https://www.plex.tv/plex-pass/) |
+
+### Optional extras
+
+| Item | Approx. price (USD) | Why |
+|---|---|---|
+| **HDHomeRun Flex 4K** (4-tuner OTA) | ~$200 | Pairs with Plex Pass for live broadcast TV + DVR. Plugs into your LAN, not the HP. [SiliconDust](https://www.silicondust.com/) |
+| **VESA mount bracket** | ~$15 | Hang the HP Mini behind a TV or under a desk if shelf space is tight. [Amazon](https://www.amazon.com/dp/REPLACE-WITH-PRODUCT-ID/?tag=YOUR-TAG-20) |
+
+You'll also need free accounts on **Plex** (`plex.tv`), **Tailscale** (free for up to 100 devices, `tailscale.com`), and **Gmail** (for SMART alerts).
+
+---
+
+**Affiliate disclosure:** Some Amazon and eBay links on this page are affiliate links — if you buy through them, I earn a small commission at no extra cost to you, which helps fund continued updates to this guide. The Plex Pass link is direct (Plex doesn't offer an affiliate program). Thank you for the support.
 
 ---
 
