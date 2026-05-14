@@ -282,9 +282,11 @@ mkdir -p /mnt/nas/plex/config
 Plex runs in Docker. Samba runs natively (covered in section 6).
 
 ```bash
-sudo apt install -y docker.io docker-compose
+sudo apt install -y docker.io docker-compose-v2
 sudo usermod -aG docker nasadmin
 ```
+
+> **Why `docker-compose-v2`?** The older `docker-compose` (V1, Python-based) package was removed from Debian 12 and later. `docker-compose-v2` installs the modern Compose plugin, invoked as `docker compose` (with a space, not a hyphen) — which is what every command in this guide uses.
 
 **Fully log out and log back in**, then verify:
 
@@ -592,15 +594,41 @@ This lets all your other Tailscale-connected devices reach your home network thr
 sudo tailscale up --advertise-routes=192.168.1.0/24
 ```
 
-If the command warns about IP forwarding, enable it:
+If the command warns about IP forwarding, enable it **persistently** (the `sysctl -w` form is runtime-only and resets on reboot):
 
 ```bash
-sudo sysctl -w net.ipv6.conf.all.forwarding=1
-sudo apt install -y ethtool
-sudo ethtool -K eno1 rx-udp-gro-forwarding on rx-gro-list off
+echo 'net.ipv4.ip_forward = 1' | sudo tee /etc/sysctl.d/99-tailscale.conf
+echo 'net.ipv6.conf.all.forwarding = 1' | sudo tee -a /etc/sysctl.d/99-tailscale.conf
+sudo sysctl -p /etc/sysctl.d/99-tailscale.conf
 ```
 
-(Replace `eno1` with your actual interface name from `ip link show` if different.)
+Tailscale also recommends a UDP GRO tweak for better subnet-routing throughput. Set it up as a one-shot systemd service so it survives reboots:
+
+```bash
+sudo apt install -y ethtool
+NETIF=$(ip -o route get 8.8.8.8 | awk '{print $5}')
+echo "Detected interface: $NETIF"
+
+sudo tee /etc/systemd/system/tailscale-ethtool.service > /dev/null <<EOF
+[Unit]
+Description=Tailscale UDP GRO tweak for $NETIF
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/ethtool -K $NETIF rx-udp-gro-forwarding on rx-gro-list off
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now tailscale-ethtool.service
+```
+
+> **Why both IPv4 and IPv6?** Even if your home LAN is IPv4-only, advertising the subnet requires `net.ipv4.ip_forward=1`. The IPv6 forwarding line covers tailnet IPv6 traffic. Setting both is the safe default.
 
 Then **approve the subnet route** in the Tailscale admin:
 
@@ -737,32 +765,52 @@ Replace `your-email@gmail.com` with your email. This schedules:
 Install the mail tools:
 
 ```bash
-sudo apt install -y ssmtp mailutils
+sudo apt install -y msmtp msmtp-mta mailutils
 ```
+
+> **Why msmtp?** Older guides use `ssmtp`, but it was removed from Debian's official repos in version 12 (no longer maintained upstream). `msmtp` is the modern, actively-maintained replacement. The `msmtp-mta` package installs a `sendmail`-compatible wrapper, so the standard `mail` command and `smartd`'s alert pipeline work unchanged.
 
 You'll need a **Gmail App Password** (regular Gmail passwords don't work for SMTP):
 
-1. Go to `myaccount.google.com → Security`
-2. Enable **2-Step Verification** if not already on
-3. Click **App Passwords**, create one named "NAS"
-4. Copy the 16-character password Google generates
+1. Visit `https://myaccount.google.com/security`
+2. Enable **2-Step Verification** if it isn't already
+3. Visit `https://myaccount.google.com/apppasswords`, create one named "NAS"
+4. Copy the 16-character password Google generates — **strip the spaces it displays** (`abcd efgh ijkl mnop` becomes `abcdefghijklmnop`)
 
-Configure ssmtp:
+Configure msmtp:
 
 ```bash
-sudo nano /etc/ssmtp/ssmtp.conf
+sudo nano /etc/msmtprc
 ```
 
-Replace everything with:
+Paste in:
 
 ```
-root=your-email@gmail.com
-mailhub=smtp.gmail.com:587
-AuthUser=your-email@gmail.com
-AuthPass=<paste-your-16-char-app-password-here>
-UseTLS=YES
-UseSTARTTLS=YES
-hostname=homenas
+defaults
+auth on
+tls on
+tls_starttls on
+tls_trust_file /etc/ssl/certs/ca-certificates.crt
+logfile /var/log/msmtp.log
+
+account gmail
+host smtp.gmail.com
+port 587
+from your-email@gmail.com
+user your-email@gmail.com
+password <paste-your-16-char-app-password-here>
+
+account default : gmail
+```
+
+Lock down the file (it contains a password) and create the log:
+
+```bash
+sudo chmod 640 /etc/msmtprc
+sudo chown root:mail /etc/msmtprc
+sudo touch /var/log/msmtp.log
+sudo chmod 640 /var/log/msmtp.log
+sudo chown root:mail /var/log/msmtp.log
 ```
 
 Test:
@@ -771,7 +819,15 @@ Test:
 echo "Test from NAS" | mail -s "NAS Test Email" your-email@gmail.com
 ```
 
-Check your Gmail. If it arrived, you're set.
+Check your inbox (and Spam folder). If the email arrived, you're set.
+
+If it didn't, check the log:
+
+```bash
+sudo tail -20 /var/log/msmtp.log
+```
+
+The most common error is **`535 Authentication failed`** — almost always means the App Password still has spaces in it. Re-edit `/etc/msmtprc` and re-type the password without spaces.
 
 ### 9.5 Enable the smartd service
 
@@ -1031,7 +1087,7 @@ Fill in your own values — substitute these everywhere the guide shows the exam
 | `/home/nasadmin/docker/docker-compose.yml` | Plex compose file |
 | `/etc/samba/smb.conf` | Samba share config |
 | `/etc/smartd.conf` | Drive health monitoring config |
-| `/etc/ssmtp/ssmtp.conf` | Outgoing mail config |
+| `/etc/msmtprc` | Outgoing mail config |
 
 ### Common commands
 
