@@ -120,10 +120,31 @@ ip link show
 
 For Wi-Fi, run `nmtui` for a text-based network manager.
 
-If `ping 8.8.8.8` works but `apt update` fails to resolve hostnames, it's a DNS issue. Add a public resolver:
+If `ping 8.8.8.8` works but `apt update` fails to resolve hostnames, it's a DNS issue. Add a public resolver **persistently** — on most Debian installs, `/etc/resolv.conf` is auto-generated and any direct edits get overwritten on the next network event.
+
+Find out who manages your resolver:
+
+```bash
+ls -l /etc/resolv.conf
+```
+
+If the output shows a symlink to `/run/systemd/resolve/...`, **systemd-resolved** is in charge. Add the resolver there:
+
+```bash
+sudo sed -i 's/^#\?DNS=.*/DNS=8.8.8.8 1.1.1.1/' /etc/systemd/resolved.conf
+sudo systemctl restart systemd-resolved
+```
+
+If `/etc/resolv.conf` is a regular file (not a symlink), it's safe to edit directly:
 
 ```bash
 echo "nameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf
+```
+
+Verify resolution works:
+
+```bash
+getent hosts deb.debian.org
 ```
 
 ### 1.2 Add your user to sudo
@@ -198,6 +219,13 @@ sudo apt install -y mdadm
 ```
 
 ### 2.3 Create the RAID 1 array
+
+> ⚠️ **STOP. This step is destructive.** `mdadm --create` will erase whatever is on the target devices. Before running it, confirm with `lsblk` that:
+>
+> - `/dev/sda` and `/dev/sdb` are the two **TerraMaster** drives (each showing the full HDD capacity, e.g. `7.3T`, with no mounted partitions)
+> - Your **internal** drive (with Debian on it) is a different device — typically `nvme0n1`
+>
+> If the TerraMaster drives show up as different letters (e.g. `sdc` and `sdd` because you have extra USB storage attached), **substitute those names below**. Running this command on the wrong device wipes it with no warning.
 
 ```bash
 sudo mdadm --create --verbose /dev/md0 --level=1 --raid-devices=2 /dev/sda /dev/sdb
@@ -700,11 +728,21 @@ If your router asks for a **port range**, enter `32400` for both the start and e
 
 ### 8.2 Verify in Plex
 
-Open Plex Web on the HP at `http://localhost:32400/web` and go to **Settings → Remote Access**.
+From any device on your home network, open Plex Web at your HP's local IP:
+
+```
+http://192.168.1.100:32400/web
+```
+
+(Substitute your HP's actual LAN IP from §5.3.)
+
+Sign in, then go to **Settings → Remote Access**.
 
 You should see, in green: **"Fully accessible outside your network."**
 
 If it still complains, check the **"Manually specify public port"** box and set it to `32400`.
+
+> If you installed Debian with a desktop and have a browser on the HP itself, `http://localhost:32400/web` works there too. For a headless server install, use the LAN URL above from your laptop or phone.
 
 ---
 
