@@ -11,7 +11,7 @@ A complete, battle-tested recipe for building a 14 TB redundant home NAS that st
 By the end of this guide you'll have:
 
 - A Debian 13 server running on an HP Mini
-- Two drives in software RAID 1 (mirrored — either drive can fail with no data loss)
+- Two drives (minimum) in software RAID 1 (mirrored — either drive can fail with no data loss)
 - **Plex** streaming to phones, TVs, and laptops on your network and remotely
 - **Samba** file shares with per-user passwords and a shared media folder
 - **Tailscale** for secure remote access from anywhere with no router exposure
@@ -20,7 +20,7 @@ By the end of this guide you'll have:
 
 *Plex runs in a Docker container; Samba, Tailscale, and Smartmontools run natively on Debian. You'll need basic comfort with Docker (or willingness to copy-paste a `docker-compose.yml`) — no prior expertise required.*
 
-**Cost vs. Synology DS224+ (2-bay, 14 TB equivalent):**
+**Cost vs. Synology DS224+ (2-bay, 8 TB equivalent):**
 - This build (HP Mini used + TerraMaster D2-310 + 2× 8 TB drives): **roughly $400–$500**
 - Synology DS224+ + 2× 8 TB drives: **roughly $900–$1,100**
 
@@ -618,30 +618,57 @@ Get the Tailscale app for iOS, Android, macOS, or Windows. Sign in with the same
 
 ---
 
-## 8. Plex Remote Access (Orbi Port Forwarding)
+## 8. Plex Remote Access (Router Port Forwarding)
 
 Tailscale is great for personal remote access. But if you want to share your Plex library with friends or family who **don't have Tailscale**, Plex needs a direct path from the internet to your server. This means port forwarding on your router.
 
 > **Why?** Without port forwarding, Plex falls back to its own relay server, which is throttled to **2 Mbps per stream** — unwatchable above 480p.
 
-### 8.1 Forward port 32400 on your Orbi
+### 8.1 Forward port 32400 on your router
 
-1. Log into the Orbi admin: `http://orbilogin.com` (or `http://192.168.1.1`)
-   - Default username: `admin`
-   - Default password: usually `password`, or check the sticker on the bottom of the router
-2. Go to **Advanced → Advanced Setup → Port Forwarding / Port Triggering**
-3. Click **Add Custom Service**
-4. Fill in:
-   - **Service Name:** `Plex`
-   - **Service Type:** `TCP`
-   - **External Starting Port:** `32400`
-   - **External Ending Port:** `32400`
-   - **Internal IP Address:** `192.168.1.100`
-   - **Internal Starting Port:** `32400`
-   - **Internal Ending Port:** `32400`
-5. Click **Apply**
+Every consumer router can do port forwarding, but the menu names and field labels vary. The concept is the same everywhere: tell the router to send incoming **TCP traffic on port 32400** from the internet to **your HP Mini's local IP on port 32400**.
 
-Other routers (Eero, ASUS, UniFi, etc.) work the same way — find the port-forwarding section and forward TCP 32400 to your HP's local IP.
+**Step 1 — Open your router's admin interface.**
+
+In a browser on a device connected to your home network, try one of these addresses. If none load, run `ip route | grep default` on the HP Mini — the IP that comes back is your router's admin address.
+
+| Vendor | Admin access |
+|---|---|
+| Netgear / Orbi | `http://routerlogin.net` or `http://192.168.1.1` |
+| eero | **eero** mobile app (no web UI) |
+| ASUS | `http://router.asus.com` or `http://192.168.1.1` |
+| TP-Link | `http://tplinkwifi.net` or `http://192.168.0.1` |
+| Linksys | `http://myrouter.local` or `http://192.168.1.1` |
+| Google Nest Wifi | **Google Home** mobile app |
+| UniFi | `https://unifi.ui.com` or your controller's local URL |
+
+Login credentials are usually on a sticker on the back/bottom of the router. Common defaults: `admin / admin`, `admin / password`, or a unique password printed on the device.
+
+**Step 2 — Find the port forwarding section.**
+
+| Vendor | Typical menu path |
+|---|---|
+| Netgear / Orbi | Advanced → Advanced Setup → Port Forwarding / Port Triggering → **Add Custom Service** |
+| eero | Settings → Network Settings → Reservations & Port Forwarding |
+| ASUS | WAN → **Virtual Server / Port Forwarding** |
+| TP-Link | Advanced → NAT Forwarding → Port Forwarding |
+| Linksys | Security → Apps & Gaming → **Single Port Forwarding** |
+| Google Nest Wifi | Wi-Fi → Settings → Advanced networking → Port management |
+| UniFi | Settings → Routing → Port Forwarding |
+
+**Step 3 — Add a new rule with these values:**
+
+| Field (varies by vendor) | Value |
+|---|---|
+| Name / Description / Service Name | `Plex` |
+| Protocol / Service Type | `TCP` |
+| External / WAN / Public port | `32400` |
+| Internal / LAN / Private port | `32400` |
+| Internal IP / Destination / Device | Your HP Mini's local IP (e.g. `192.168.1.100`) |
+
+If your router asks for a **port range**, enter `32400` for both the start and end. If it asks for an **application/service preset**, choose custom/manual. UDP is not required — Plex remote access only needs TCP.
+
+**Step 4 — Save / Apply.** Most routers apply the rule immediately; a few require a reboot.
 
 ### 8.2 Verify in Plex
 
