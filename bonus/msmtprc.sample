@@ -1,0 +1,34 @@
+# msmtp Gmail SMTP config — pairs with §9.4 of the guide.
+#
+# Drop in as /etc/msmtprc, then tighten permissions:
+#   sudo cp bonus/msmtprc.sample /etc/msmtprc
+#   sudo nano /etc/msmtprc                         # substitute values below
+#   sudo chmod 640 /etc/msmtprc
+#   sudo chown root:mail /etc/msmtprc
+#   sudo touch /var/log/msmtp.log
+#   sudo chmod 640 /var/log/msmtp.log
+#   sudo chown root:mail /var/log/msmtp.log
+#
+# Before saving:
+#   - Replace your-email@gmail.com with the Gmail account that owns the
+#     App Password (in two places: `from` and `user`).
+#   - Replace the password placeholder with your 16-character App Password
+#     (from https://myaccount.google.com/apppasswords).
+#     Strip the spaces Google displays — `abcd efgh ijkl mnop` becomes
+#     `abcdefghijklmnop`.
+
+defaults
+auth on
+tls on
+tls_starttls on
+tls_trust_file /etc/ssl/certs/ca-certificates.crt
+logfile /var/log/msmtp.log
+
+account gmail
+host smtp.gmail.com
+port 587
+from your-email@gmail.com
+user your-email@gmail.com
+password <paste-your-16-char-app-password-here>
+
+account default : gmail

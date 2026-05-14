@@ -1,0 +1,53 @@
+# Samba share blocks — pairs with §6.3 of the guide.
+#
+# Append to the end of /etc/samba/smb.conf (do not overwrite — Debian's
+# default [global] section above the share blocks must be preserved).
+#
+# Quick install:
+#   cat bonus/smb.conf.sample | sudo tee -a /etc/samba/smb.conf
+#   sudo testparm                         # syntax-check
+#   sudo systemctl restart smbd nmbd
+#
+# Before saving, substitute the user names (alice, bob, carol, dave) to
+# match the household members you created with `smbpasswd -a <user>`.
+
+[media]
+   path = /mnt/nas/media
+   browseable = yes
+   read only = no
+   guest ok = no
+   valid users = alice, bob, carol, dave
+   create mask = 0664
+   directory mask = 0775
+
+[alice]
+   path = /mnt/nas/backups/alice
+   browseable = yes
+   read only = no
+   valid users = alice
+   create mask = 0664
+   directory mask = 0775
+
+[bob]
+   path = /mnt/nas/backups/bob
+   browseable = yes
+   read only = no
+   valid users = bob
+   create mask = 0664
+   directory mask = 0775
+
+[carol]
+   path = /mnt/nas/backups/carol
+   browseable = yes
+   read only = no
+   valid users = carol
+   create mask = 0664
+   directory mask = 0775
+
+[dave]
+   path = /mnt/nas/backups/dave
+   browseable = yes
+   read only = no
+   valid users = dave
+   create mask = 0664
+   directory mask = 0775

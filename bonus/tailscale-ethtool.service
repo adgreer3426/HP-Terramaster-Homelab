@@ -1,0 +1,29 @@
+# Tailscale UDP GRO tweak — pairs with §7.3 of the guide.
+#
+# This systemd one-shot applies an ethtool offload setting that Tailscale
+# recommends for subnet-routing throughput. Without it, the setting is
+# runtime-only and resets on every reboot.
+#
+# Drop in as /etc/systemd/system/tailscale-ethtool.service, then enable:
+#   sudo cp bonus/tailscale-ethtool.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now tailscale-ethtool.service
+#
+# Before enabling, replace `eno1` with your actual network interface name.
+# Find it with:
+#   ip -br link show
+# or auto-detect the default-route interface with:
+#   ip -o route get 8.8.8.8 | awk '{print $5}'
+
+[Unit]
+Description=Tailscale UDP GRO tweak
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/ethtool -K eno1 rx-udp-gro-forwarding on rx-gro-list off
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1013,7 +1013,7 @@ brew install rsync
 
 1. Open **Script Editor** (Applications → Utilities)
 2. **File → New**
-3. Paste the contents of `NAS_Transfer.applescript` (included with this guide bundle)
+3. Paste the contents of `NAS_Transfer.applescript` (in the `bonus/` folder of this guide bundle)
 4. **File → Export…**
    - **File Format:** Application
    - **Save As:** `NAS Transfer.app`
@@ -1042,7 +1042,7 @@ In File Explorer, right-click "This PC" → **Map network drive**:
 - Check **Reconnect at sign-in**
 - Check **Connect using different credentials**, then enter your Samba username and password
 
-**Step 2 — Create `NAS_Transfer.bat` on your desktop:**
+**Step 2 — Create `NAS_Transfer.bat` on your desktop** (or just copy the polished version from the `bonus/` folder of this guide bundle, which adds destination-reachable checks):
 
 ```batch
 @echo off

@@ -1,0 +1,17 @@
+# Smartmontools schedule — pairs with §9.3 of the guide.
+#
+# In /etc/smartd.conf, comment out the existing DEVICESCAN line by adding
+# a leading '#', then append the two lines below.
+#
+# Schedule:
+#   - Short SMART test every day at 02:00
+#   - Long SMART test every Saturday at 03:00
+#   - Email alert on any failure
+#
+# Before saving:
+#   - Replace your-email@gmail.com with your alert recipient.
+#   - Confirm /dev/sda and /dev/sdb really are the TerraMaster drives
+#     (run `lsblk` — your internal drive is typically nvme0n1).
+
+/dev/sda -a -o on -S on -s (S/../.././02|L/../../6/03) -m your-email@gmail.com -M exec /usr/share/smartmontools/smartd-runner
+/dev/sdb -a -o on -S on -s (S/../.././02|L/../../6/03) -m your-email@gmail.com -M exec /usr/share/smartmontools/smartd-runner

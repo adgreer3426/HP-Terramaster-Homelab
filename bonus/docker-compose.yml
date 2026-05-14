@@ -1,0 +1,30 @@
+# HomeNAS Plex compose file — pairs with §5.1 of the guide.
+#
+# Drop in as ~/docker/docker-compose.yml on the HP Mini, then:
+#   cd ~/docker
+#   docker compose up -d
+#
+# Before starting, substitute:
+#   - TZ: your timezone (Region/City). See `timedatectl` or
+#     https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+#   - PUID/PGID: confirm with `id <your-admin-user>` on the HP.
+#   - PLEX_CLAIM: get a fresh token from https://plex.tv/claim
+#     (expires in 4 minutes). Remove this line entirely after
+#     the server has been claimed.
+
+services:
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    ports:
+      - 32400:32400
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+      - VERSION=docker
+      - PLEX_CLAIM=<paste-your-token-here>
+    volumes:
+      - /mnt/nas/plex/config:/config
+      - /mnt/nas/media:/media
+    restart: unless-stopped
