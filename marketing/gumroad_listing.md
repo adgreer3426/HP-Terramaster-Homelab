@@ -6,21 +6,13 @@ Draft copy for the Gumroad product page. Fields below map 1:1 to Gumroad's produ
 
 ## Product name (max ~60 chars)
 
-**Option A (recommended — direct):**
 > Build a Home NAS: The Synology Alternative
-
-**Option B (cost-led):**
-> The $500 Home NAS: Skip the Synology Tax
 
 ---
 
 ## Tagline / subtitle (Gumroad shows under the title)
 
-**Option A:**
 > A battle-tested recipe for a 14 TB Plex + file-share NAS — for half the cost of a Synology DS224+.
-
-**Option B:**
-> Used HP Mini + TerraMaster + Debian + RAID 1. Roughly $500 all in. No proprietary OS, no licensing surprises.
 
 ---
 
@@ -142,7 +134,7 @@ Use `cover.png` (already in the repo). 1500×1500 minimum on Gumroad; scale if n
 
 ## Author note (optional — Gumroad supports an "About the creator" block)
 
-I'm a software engineer who got tired of paying the Synology premium and wanted a NAS I could actually understand, repair, and outlive any one vendor. I built this exact setup in my home, ran it for [X months/years], debugged it through the typical homelab teething, and turned the notes into this guide. Every command in the PDF is one I ran on my own machine. If you hit something the guide doesn't cover, email me — I read everything.
+I'm a software engineer who got tired of paying the Synology premium and wanted a NAS I could actually understand, repair, and outlive any one vendor. I built this exact setup in my own home, debugged it through the typical homelab teething, and turned the notes into this guide. Every command in the PDF is one I ran on my own machine. If you hit something the guide doesn't cover, email me — I read everything.
 
 ---
 
