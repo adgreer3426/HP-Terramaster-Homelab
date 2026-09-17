@@ -1,11 +1,23 @@
-# Kalshi Weather Ladder Scanner
+# Kalshi Weather Scripts
+
+Two independent scripts for Kalshi's daily high/low temperature markets.
+They share no code on purpose so each can be run/deployed separately.
+
+1. `kalshi_weather_ladder_scanner.py` — flags the top/bottom rung of each
+   city's ladder (documented below).
+2. `kalshi_99_ask_alert.py` — flags *any* rung (every open market) at a
+   given ask threshold, meant to run unattended from cron and email you.
+   See [Script 2](#script-2-kalshi_99_ask_alertpy--any-rung-cron--email)
+   below.
+
+## Script 1: kalshi_weather_ladder_scanner.py — ladder extremes
 
 Scans Kalshi's daily high/low temperature "ladder" markets and flags the
 top or bottom rung of each city's ladder when its ask price (YES or NO
 side) hits a threshold — 99 cents by default, i.e. the market considers
 that extreme outcome a near-lock.
 
-## Setup
+### Setup
 
 1. Generate an RSA key pair and upload the public key in the Kalshi
    dashboard (Settings -> API Keys) to get an API Key ID:
@@ -28,7 +40,7 @@ that extreme outcome a near-lock.
    export KALSHI_PRIVATE_KEY_PATH="/secure/path/kalshi_private_key.pem"
    ```
 
-## Usage
+### Usage
 
 ```
 python3 kalshi_weather_ladder_scanner.py
@@ -39,7 +51,7 @@ python3 kalshi_weather_ladder_scanner.py --demo
 
 Run it any time — via cron, or by hand — to check current ladders.
 
-## If Kalshi changes ticker naming
+### If Kalshi changes ticker naming
 
 The script auto-discovers weather series from Kalshi's `/series` endpoint
 by matching ticker prefixes and category/title text. Kalshi has renamed
@@ -51,7 +63,55 @@ Use `--dump-raw` to print a sample raw series/market JSON object to
 stderr — handy if Kalshi changes field names (e.g. `floor_strike`) and
 you need to adjust `strike_sort_key()` in the script.
 
+## Script 2: kalshi_99_ask_alert.py — any rung, cron + email
+
+Pulls every OPEN market in every discovered weather series (every rung of
+every city's ladder, not just the extremes) and reports/emails any market
+whose YES or NO ask is sitting at a threshold — 99 cents by default. No
+positions or trading endpoints are touched, read-only market data only.
+
+Meant to run unattended on your homelab server (the HP Mini) via cron and
+alert you by email, reusing the `msmtp`/`mail` pipeline already set up for
+smartd's SMART-test alerts (see `HomeNAS_Setup_Guide.md` section 9.4) — no
+new SMTP credentials needed.
+
+### One-time setup on the server
+
+```
+pip install -r requirements.txt
+sudo mkdir -p /etc/kalshi
+sudo cp env.sample /etc/kalshi/env
+sudo nano /etc/kalshi/env          # fill in your API key ID + private key path
+sudo chmod 600 /etc/kalshi/env
+chmod +x run_99_ask_alert.sh
+```
+
+### Run it by hand
+
+```
+python3 kalshi_99_ask_alert.py                # print hits to stdout
+python3 kalshi_99_ask_alert.py --email        # also email hits if any found
+python3 kalshi_99_ask_alert.py --threshold 95
+python3 kalshi_99_ask_alert.py --series KXHIGHNY,KXLOWNY
+```
+
+Email only goes out when at least one market matches the threshold — no
+noise when nothing's hit.
+
+### Schedule it (4x/day, phone-friendly)
+
+Install the four cron lines in `crontab.sample` (6:00am, 10:15am, 3:00pm,
+5:00pm Central by default — edit the times to change frequency, no code
+change needed). Results land in your inbox, so you can check from your
+phone without SSHing in or opening a laptop.
+
+### If Kalshi changes ticker naming or field names
+
+Same as Script 1 — pass `--series` to bypass discovery, and `--dump-raw`
+to inspect the raw JSON if `yes_ask`/`no_ask` field names ever change.
+
 ## Security note
 
-Never commit your private key or API key ID to this repo. Keep them in
-environment variables or a local, gitignored file.
+Never commit your private key, API key ID, or `/etc/kalshi/env` to this
+repo. Keep them in environment variables or a local, gitignored file
+outside version control.
