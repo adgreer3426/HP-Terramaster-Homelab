@@ -20,3 +20,11 @@ HomeNAS_Setup_Guide.pdf
 
 # Buyer-facing bundle — built via `make zip`.
 HomeNAS_Setup_Guide.zip
+
+# Python
+__pycache__/
+*.pyc
+
+# API keys / private keys — never commit these.
+*.pem
+kalshi_private_key*
